@@ -1,0 +1,253 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Категории товара</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+    <!-- Modal -->
+    <div class="modal fade" id="editModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Modal title</h5>
+                </div>
+                <div class="modal-body" id="editCategoryForm">
+                    <label>Наименование</label><br />
+                    <input type="text" id="categoryName" /> <br />
+                    <label>Описание</label><br />
+                    <input type="text" id="categoryDescription" /> <br />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="closeEditModel">Отмена</button>
+                    <button type="submit" id="saveCategoryButton" value="" class="btn btn-primary">Сохранить</button>
+                    <button type="submit" id="saveNewCategoryButton" value="" class="btn btn-primary">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <br />
+        <button type="button" class="btn btn-primary" id="addNewCategoryButton">Добавить категорию</button>
+        <button type="button" class="btn btn-primary"><a style="color: white; text-decoration: none;" href="products.html">Продукты</a></button>
+        <button type="button" class="btn btn-primary" id="usersPageButton"><a style="color: white; text-decoration: none;" href="users">Пользователи</a></button>
+        <button type="button" class="btn btn-primary" id="logOutButton">Выход</button>
+        <table class="table" id="categoryTable">
+            <thead>
+                <tr>
+                    <th>
+                        Наименование
+                    </th>
+                    <th>
+                        Описание
+                    </th>
+                    <th>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+
+    </div>
+    <script src="js/jquery-3.7.0.min.js"></script>
+    <script>
+        var tokenKey = "accessToken";
+        var userRole = "user";
+
+        $(document).ready(function () {
+            (async () => {
+                await GetUserRole();
+                await reloadCategories();
+
+                if (userRole != "admin")
+                    $("#usersPageButton").hide();
+            })()
+
+        });
+
+        async function GetUserRole() {
+            userRole = await getData("/api/GetUserRole");
+        }
+
+        async function reloadCategories() {
+            const data = await getData("/api/GetCategories");
+
+            $("#categoryTable > tbody > tr").remove();
+            for (var i = 0; i < data.length; i++) {
+                var appendStr =
+                    '<tr>'
+                    + '<td>' + data[i].name + '</td>'
+                    + '<td>' + data[i].description + '</td>'
+                    + '<td>'
+                    + '<button onclick="editCategory(' + data[i].id + ')" >Изменить</button>'
+                    + '<button onclick="deleteCategory(' + data[i].id + ')" >Удалить</button>'
+                    + '</td > '
+                    + '</tr>';
+                $('#categoryTable > tbody:last-child').append(appendStr);
+            }
+        }
+
+        async function editCategory(id) {
+            const token = sessionStorage.getItem(tokenKey);
+
+            const response = await fetch("/api/GetCategory/" + id, {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json",
+                    "Authorization": "Bearer " + token  
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok === true) {
+                document.getElementById("categoryName").value = data.name;
+                document.getElementById("categoryDescription").value = data.description;
+                $('#saveCategoryButton').attr('value', data.id);
+                $('#modalTitle').text(data.name);
+
+                $('#saveCategoryButton').show();
+                $('#saveNewCategoryButton').hide();
+                $('#editModal').modal('show');
+                console.log(data);
+            }
+            else if (response.status == 401)
+                window.location.href = "index.html";
+            else
+                console.log("Error: ", response.status);
+        }
+
+        $("#saveCategoryButton").click(function () {
+            (async () => {
+                const token = sessionStorage.getItem(tokenKey);
+
+                const formData = new FormData();
+                formData.append("Id", document.getElementById("saveCategoryButton").value);
+                formData.append("Name", document.getElementById("categoryName").value);
+                formData.append("Description", document.getElementById("categoryDescription").value);
+
+                const response = await fetch("api/EditCategory", {
+                    method: "POST",
+                    headers: {
+                        "Accept": "application/json",
+                        "Authorization": "Bearer " + token 
+                    },
+                    body: formData
+                });
+
+                if (response.ok === true) {
+                    clearModalBox();
+                    reloadCategories();
+                }
+                else if (response.status == 401)
+                    window.location.href = "index.html";
+                else
+                    alert("Error: " + await response.json());
+            })()
+        });
+
+        $("#saveNewCategoryButton").click(function () {
+            (async () => {
+                const token = sessionStorage.getItem(tokenKey);
+
+                const formData = new FormData();
+                formData.append("Name", document.getElementById("categoryName").value);
+                formData.append("Description", document.getElementById("categoryDescription").value);
+              
+                const response = await fetch("api/AddCategory", {
+                    method: "POST",
+                    headers: {
+                        "Accept": "application/json",
+                        "Authorization": "Bearer " + token  
+                    },
+                    body: formData
+                });
+
+                if (response.ok === true) {
+                    clearModalBox();
+                    reloadCategories();
+                }
+                else if (response.status == 401)
+                    window.location.href = "index.html";
+                else
+                    alert("Error: " + await response.json());
+            })()
+        });
+
+        async function deleteCategory(id) {
+            const token = sessionStorage.getItem(tokenKey);
+
+            const response = await fetch("/api/DeleteCategory/" + id, {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Authorization": "Bearer " + token  
+                }
+            });
+
+            if (response.ok === true) {
+                await reloadCategories();
+            }
+            else if (response.status == 401)
+                window.location.href = "index.html";
+            else
+                console.log("Error: ", response.status);
+        }
+
+        $("#addNewCategoryButton").click(function () {
+            $('#modalTitle').text("Новая категория");
+            $('#saveCategoryButton').hide();
+            $('#saveNewCategoryButton').show();
+            $('#editModal').modal('show');
+        });
+
+        function clearModalBox() {
+            document.getElementById("categoryName").value = "";
+            document.getElementById("categoryDescription").value = "";
+          
+            $('#editModal').modal('hide');
+            
+        }
+
+        $('#closeEditModel').click(function () {
+            clearModalBox();
+            $('#editModal').modal('hide');
+        });
+
+        async function getData(url) {
+            const token = sessionStorage.getItem(tokenKey);
+
+            const response = await fetch(url, {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json",
+                    "Authorization": "Bearer " + token 
+                }
+            });
+            if (response.ok === true) {
+
+                const data = await response.json();
+                return data;
+            }
+            else if (response.status == 401)
+                window.location.href = "index.html";
+            else
+                console.log("Error: ", response.status);
+        };
+
+        $("#logOutButton").click(function () {
+            sessionStorage.removeItem(tokenKey);
+            window.location.href = "index.html";
+        });
+
+
+    </script>
+
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

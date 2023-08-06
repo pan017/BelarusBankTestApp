@@ -1,0 +1,361 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Каталог продукции</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+    
+</head>
+<body>
+    <div class="modal fade" id="editModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Modal title</h5>
+                </div>
+                <div class="modal-body" id="editProductForm">
+                    <label>Наименование продукта</label><br />
+                    <input type="text" id="productName" /> <br />
+
+                    <label>Категория продукта</label><br />
+                    <select id="productCategory">
+                    </select><br />
+                    <label>Описание</label><br />
+                    <input type="text" id="productDescription" /> <br />
+                    <label>Стоимость в рублях</label><br />
+                    <input type="text" onkeyup="this.value=this.value.replace(/[^\d\,]+/g,'')" id="productPrice" /> <br />
+                    <label>Примечания общее</label><br />
+                    <input type="text" id="productNotes" /> <br />
+                    <label>Примечание специальное</label><br />
+                    <input type="text" id="productPrivateNotes" /> <br />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="closeEditModel">Отмена</button>
+                    <button type="submit" id="saveProductButton" value="" class="btn btn-primary">Сохранить</button>
+                    <button type="submit" id="saveNewProductButton" value="" class="btn btn-primary">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <br />
+        <button type="button" class="btn btn-primary" id="addNewProductButton">Добавить продукт</button>
+        <button type="button" class="btn btn-primary" id="categoriesPageButton"><a style="color: white; text-decoration: none;" href="category.html">Категории товара</a></button>
+        <button type="button" class="btn btn-primary" id="usersPageButton"><a style="color: white; text-decoration: none;" href="users">Пользователи</a></button>
+        <button type="button" class="btn btn-primary" id="logOutButton">Выход</button>
+        <br />
+        <label>Фильтр категории</label><br />
+        <select id="productCategoryFilter">
+        </select><br />
+        <div class="form-group">
+            <br />
+            <input type="text" class="" id="search" placeholder="Поиск по таблице">
+        </div>
+        <table class="table" id="productsTable">
+            <thead>
+                <tr>
+                    <th>
+                        Наименование продукта
+                    </th>
+                    <th>
+                        Категория
+                    </th>
+                    <th>
+                        Описание
+                    </th>
+                    <th>
+                        Стоимость в рублях
+                    </th>
+                    <th>
+                        Примечания общее
+                    </th>
+                    <th>
+                        Примечание специальное
+                    </th>
+                    <th>
+
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+
+    </div>
+    <script src="js/jquery-3.7.0.min.js"></script>
+    <script src="js/jquery.maskedinput.min.js"></script>
+    <script>
+        var tokenKey = "accessToken";
+        var usdRate;
+        var userRole = "user";
+
+        $(document).ready(function () {
+            (async () => {
+                const response = await fetch('https://api.nbrb.by/ExRates/Rates/840?ParamMode=1', {
+                    method: "GET",
+                    headers: {
+                        "Accept": "application/json"
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok === true) {
+
+
+                    usdRate = data.Cur_OfficialRate
+                }
+
+                await GetUserRole();
+                await GetCategories();
+                await reloadProductsData();
+
+                if (userRole != "admin")
+                    $("#usersPageButton").hide();
+
+                if (userRole == "user")
+                    $("#categoriesPageButton").hide();
+            })()
+
+        });
+
+        async function GetUserRole() {
+            userRole = await getData("/api/GetUserRole");
+        }
+
+        async function GetCategories() {
+            const data = await getData("/api/GetCategories");
+
+            $('#productCategoryFilter').append("<option selected='selected' value='0'>Все</option>");
+
+            for (var i = 0; i < data.length; i++) {
+                $('#productCategory').append("<option value='" + data[i].id + "'>" + data[i].name + "</option>");
+                $('#productCategoryFilter').append("<option value='" + data[i].id + "'>" + data[i].name + "</option>");
+            }
+        }
+
+        $(".target").on("change", function () {
+            alert("Handler for `change` called.");
+        });
+
+        $("#productCategoryFilter").on("change", function () {
+            reloadProductsData($("#productCategoryFilter").val());
+        });
+
+        async function reloadProductsData(filterCategoryId = 0) {
+            const data = await getData("/api/GetProducts");
+            $("#productsTable > tbody > tr").remove();
+            for (var i = 0; i < data.length; i++) {
+
+                if (filterCategoryId != 0 && data[i].productCategory["id"] != filterCategoryId)
+                    continue;
+
+                var appendStr =
+                    '<tr>'
+                    + '<td>' + data[i].name + '</td>'
+                    + '<td>' + data[i].productCategory["name"] + '</td>'
+                    + '<td>' + data[i].description + '</td>'
+                    + '<td> <div title="' + data[i].price * usdRate + ' USD">' + data[i].price + ' * </div></td>'
+                    + '<td>' + data[i].notes + '</td>'
+                    + '<td>' + data[i].notesPrivate + '</td>'
+                    + '<td>'
+                    + '<button onclick="editProduct(' + data[i].id + ')" >Изменить</button> ';
+
+                if (userRole != "user")
+                    appendStr += '<button id="deleteProductButton" onclick="deleteProduct(' + data[i].id + ')" >Удалить</button> </td > '; 
+
+                appendStr += '</tr>';
+
+                $('#productsTable > tbody:last-child').append(appendStr);
+            }
+            console.log(data);
+        }
+
+        async function editProduct(id) {
+            const token = sessionStorage.getItem(tokenKey);
+
+            const response = await fetch("/api/GetProduct/" + id, {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Authorization": "Bearer " + token
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok === true) {
+                document.getElementById("productName").value = data.name;
+                document.getElementById("productDescription").value = data.description;
+                document.getElementById("productPrice").value = data.price;
+                document.getElementById("productNotes").value = data.notes;
+                document.getElementById("productPrivateNotes").value = data.notesPrivate;
+
+                $('#saveProductButton').attr('value', data.id);
+                $('#modalTitle').text(data.name);
+
+                $('#saveProductButton').show();
+                $('#saveNewProductButton').hide();
+                $('#editModal').modal('show');
+                console.log(data);
+            }
+            else if (response.status == 401)
+                window.location.href = "index.html";
+            else
+                console.log("Error: ", response.status);
+        }
+
+        $("#saveProductButton").click(function () {
+            (async () => {
+                const token = sessionStorage.getItem(tokenKey);
+
+                const formData = new FormData();
+                formData.append("Id", document.getElementById("saveProductButton").value);
+                formData.append("Name", document.getElementById("productName").value);
+                formData.append("Description", document.getElementById("productDescription").value);
+                formData.append("Category", document.getElementById("productCategory").value);
+                formData.append("Price", document.getElementById("productPrice").value);
+                formData.append("Notes", document.getElementById("productNotes").value);
+                formData.append("NotesPrivate", document.getElementById("productPrivateNotes").value);
+
+                const response = await fetch("api/EditProduct", {
+                    method: "POST",
+                    headers: {
+                        "Accept": "application/json",
+                        "Authorization": "Bearer " + token  
+                    },
+                    body: formData
+                });
+
+                if (response.ok === true) {
+                    clearModalBox();
+                    reloadProductsData();
+                }
+                else if (response.status == 401)
+                    window.location.href = "index.html";
+                else
+                    alert("Error: " + await response.json());
+            })()
+        });
+
+        $("#saveNewProductButton").click(function () {
+            (async () => {
+                const token = sessionStorage.getItem(tokenKey);
+
+                const formData = new FormData();
+                formData.append("Name", document.getElementById("productName").value);
+                formData.append("Description", document.getElementById("productDescription").value);
+                formData.append("Category", document.getElementById("productCategory").value);
+                formData.append("Price", document.getElementById("productPrice").value);
+                formData.append("Notes", document.getElementById("productNotes").value);
+                formData.append("NotesPrivate", document.getElementById("productPrivateNotes").value);
+
+                const response = await fetch("api/AddProduct", {
+                    method: "POST",
+                    headers: {
+                        "Accept": "application/json",
+                        "Authorization": "Bearer " + token 
+                    },
+                    body: formData
+                });
+
+                if (response.ok === true) {
+                    clearModalBox();
+                    reloadProductsData();
+                }
+                else if (response.status == 401)
+                    window.location.href = "index.html";
+                else
+                    alert("Error: " + await response.json());
+            })()
+        });
+
+        async function deleteProduct(id) {
+            const token = sessionStorage.getItem(tokenKey);
+
+            const response = await fetch("/api/DeleteProduct/" + id, {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Authorization": "Bearer " + token 
+                }
+            });
+
+            if (response.ok === true) {
+                await reloadProductsData();
+            }
+            else if (response.status == 401)
+                window.location.href = "index.html";
+            else
+                console.log("Error: ", response.status);
+        }
+
+        $("#addNewProductButton").click(function () {
+            $('#modalTitle').text("Новый продукт");
+            $('#saveProductButton').hide();
+            $('#saveNewProductButton').show();
+            $('#editModal').modal('show');
+        });
+
+        function clearModalBox() {
+            $('#editModal').modal('hide');
+            document.getElementById("productName").value = "";
+            document.getElementById("productDescription").value = "";
+            document.getElementById("productPrice").value = "";
+            document.getElementById("productNotes").value = "";
+            document.getElementById("productPrivateNotes").value = "";
+            $('#saveProductButton').attr('value', '');
+        }
+
+        $('#closeEditModel').click(function () {
+            clearModalBox();
+            $('#editModal').modal('hide');
+        });
+
+        async function getData(url) {
+            const token = sessionStorage.getItem(tokenKey);
+
+            const response = await fetch(url, {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json",
+                    "Authorization": "Bearer " + token  
+                }
+            });
+            if (response.ok === true) {
+
+                const data = await response.json();
+                return data;
+            }
+            else if (response.status == 401)
+                window.location.href = "index.html";
+            else
+                console.log("Error: ", response.status);
+        };
+
+        $("#logOutButton").click(function () {
+            sessionStorage.removeItem(tokenKey);
+            window.location.href = "index.html";
+        });
+
+        
+        $("#search").keyup(function () {
+            _this = this;
+
+            $.each($("#productsTable tbody tr"), function () {
+                if ($(this).text().toLowerCase().indexOf($(_this).val().toLowerCase()) === -1) {
+                    $(this).hide();
+                } else {
+                    $(this).show();
+                }
+            });
+        });
+
+    </script>
+
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

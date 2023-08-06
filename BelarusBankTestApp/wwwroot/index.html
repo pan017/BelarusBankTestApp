@@ -1,0 +1,66 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>BelarusBankTestApp</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+    <div class="container">
+        <div id="userInfo" style="display:none;">
+            <p>Вы вошли как: <span id="userName"></span></p>
+            <input type="button" value="Выйти" id="logOut" />
+        </div>
+        <div id="loginForm">
+            <h3>Вход на сайт</h3>
+            <label>Введите email</label><br />
+            <input type="email" id="emailLogin" /> <br /><br />
+            <label>Введите пароль</label><br />
+            <input type="password" id="passwordLogin" /><br /><br />
+            <input class="btn btn-primary" type="submit" id="submitLogin" value="Логин" />
+        </div>
+
+    </div>
+    <script src="js/jquery-3.7.0.min.js"></script>
+
+    <script>
+        var tokenKey = "accessToken";
+
+        async function getTokenAsync() {
+            const formData = new FormData();
+            formData.append("grant_type", "password");
+            formData.append("username", document.getElementById("emailLogin").value);
+            formData.append("password", document.getElementById("passwordLogin").value);
+
+            const response = await fetch("/login", {
+                method: "POST",
+                headers: { "Accept": "application/json" },
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (response.ok === true) {
+                sessionStorage.setItem(tokenKey, data.access_token);
+                console.log(data.access_token);
+
+                window.location.href = "products.html";
+            }
+            else {
+                alert(data.errorText);
+            }
+        };
+
+        document.getElementById("submitLogin").addEventListener("click", e => {
+            e.preventDefault();
+            getTokenAsync();
+        });
+
+
+    </script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+
+
+</body>
+</html>
